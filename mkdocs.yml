@@ -27,9 +27,8 @@ theme:
   features:
     - navigation.tabs
     - navigation.tabs.sticky
-    - navigation.sections
-    - navigation.expand
     - navigation.indexes
+    - navigation.path
     - navigation.top
     - toc.follow
     - search.suggest
@@ -42,25 +41,21 @@ theme:
 
 nav:
   - Home: index.md
-  - Architecture: architecture.md
-  - Infrastructure: infrastructure.md
-  - Databases: databases.md
-  - Deployment: deployment.md
-  - Shutdown & Recovery: shutdown-and-recovery.md
-  - Projects:
-    - projects/index.md
-    - GIV Admin Dashboard: projects/giv-admin-new.md
-    - KRO Backend: projects/kro-backend.md
-    - KRO DevOps: projects/kro-devops.md
-    - KROGiving Backend: projects/krogiving-backend.md
-    - KROGiving Frontend: projects/krogiving-frontend.md
-    - Pencom (eHub):
-      - projects/pencom/index.md
-      - Architecture: projects/pencom/architecture.md
-      - Business Logic: projects/pencom/business-logic.md
-      - Domain Model: projects/pencom/domain-model.md
-      - Integrations & Env Vars: projects/pencom/integrations.md
-      - Developer Onboarding: projects/pencom/onboarding.md
+  - KROTrust:
+    - projects/kro/index.md
+    - Architecture: projects/kro/architecture.md
+    - Deployment: projects/kro/deployment.md
+  - KROGiving:
+    - projects/krogiving/index.md
+    - Architecture: projects/krogiving/architecture.md
+    - Deployment: projects/krogiving/deployment.md
+  - Pencom (eHub):
+    - projects/pencom/index.md
+    - Architecture: projects/pencom/architecture.md
+    - Business Logic: projects/pencom/business-logic.md
+    - Domain Model: projects/pencom/domain-model.md
+    - Integrations & Env Vars: projects/pencom/integrations.md
+    - Developer Onboarding: projects/pencom/onboarding.md
 
 markdown_extensions:
   - admonition

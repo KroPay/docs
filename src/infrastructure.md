@@ -135,56 +135,144 @@ Cloudinary is used for video uploads (via `useCloudinaryVideoUpload` hook in fro
 
 ### Overview
 
-The Pencom system runs entirely on internal/on-premises infrastructure. No cloud provider details are documented in the repositories.
+The Pencom/eHub system runs entirely on-premises across four dedicated VPS nodes. All Docker containers are deployed via GitHub Actions to self-hosted runners on each VPS. There is no cloud provider dependency for eHub compute or databases.
+
+### VPS Topology
+
+```
+┌─────────────────────────────────────────────────────┐
+│  VPS 1 — Internet-Facing (Ingress)                  │
+│  Exposed to the public internet                     │
+│                                                     │
+│  ├── Nginx (TLS termination, reverse proxy)         │
+│  ├── api-gateway          :3000                     │
+│  └── external-gateway     :3010                     │
+└────────────────────┬────────────────────────────────┘
+                     │ Internal network only
+┌────────────────────▼────────────────────────────────┐
+│  VPS 2 — Core Services                              │
+│  Not internet-accessible; internal network only     │
+│                                                     │
+│  ├── core                 :4000                     │
+│  ├── payments             :5000                     │
+│  ├── compliance           :6000                     │
+│  ├── notifications        :7000                     │
+│  ├── external-integrations :8000                   │
+│  └── audit                :9000                     │
+└────────────────────┬────────────────────────────────┘
+                     │ Internal network only
+┌────────────────────▼────────────────────────────────┐
+│  VPS 3 — Databases                                  │
+│  Not internet-accessible; internal network only     │
+│                                                     │
+│  ├── PostgreSQL                                     │
+│  │   ├── pencom_core_db2          (core)            │
+│  │   ├── pencom_payments          (payments)        │
+│  │   ├── pencom_compliance        (compliance +     │
+│  │   │                             external-gateway)│
+│  │   ├── pencom_external_integrations               │
+│  │   └── pencom_audit             (audit)           │
+│  ├── MongoDB                                        │
+│  │   ├── pencom_notifications     (notifications)   │
+│  │   └── pencom_core_otp          (core OTPs)       │
+│  └── Redis                                          │
+│      └── Bull queues + magic-link cache             │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  VPS 4 — Object Storage                             │
+│                                                     │
+│  └── MinIO (S3-compatible object store)             │
+│      ├── PCC certificates (PDFs)                    │
+│      ├── Employer registration documents            │
+│      ├── PFC contribution CSVs                      │
+│      └── Tutorial videos + thumbnails               │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Existing PenCom On-Prem (managed by PenCom)        │
+│                                                     │
+│  └── Oracle ECRS DB                                 │
+│      Read-only access by core + compliance          │
+└─────────────────────────────────────────────────────┘
+```
 
 ### Service Ports
 
-Each microservice listens on its own HTTP and TCP port:
+| Service | VPS | HTTP Port | Role |
+|---|---|---|---|
+| api-gateway | VPS 1 | 3000 | Public internet — employer & admin portal |
+| external-gateway | VPS 1 | 3010 | Public internet — PFC partner API |
+| core | VPS 2 | 4000 | Internal — employer/employee domain, Oracle bridge |
+| payments | VPS 2 | 5000 | Internal — Remita payment state |
+| compliance | VPS 2 | 6000 | Internal — contributions, penalties, PCC/GLI |
+| notifications | VPS 2 | 7000 | Internal — email/SMS fan-out |
+| external-integrations | VPS 2 | 8000 | Internal — CAC CRUD, PFC partner credentials |
+| audit | VPS 2 | 9000 | Internal — append-only audit log |
 
-| Service | HTTP Port | TCP Port |
-|---|---|---|
-| api-gateway | 3000 | 3001 |
-| external-gateway | 3010 | — |
-| core | 4000 | 4001 |
-| payments | 5000 | 5001 |
-| compliance | 6000 | 6001 |
-| notifications | 7000 | 7001 |
-| external-integrations | 8000 | — |
-| audit | 9000 | — |
+Inter-service calls are HTTP with `x-internal-api-key` header. TCP microservice transport is declared on some services but only used internally within `notifications` for fire-and-forget email dispatch.
 
-Services communicate with each other over TCP using NestJS microservices (not HTTP-to-HTTP calls).
+### CI/CD (Pencom)
+
+Deployment via GitHub Actions with self-hosted runners installed on the VPS nodes.
+
+| Workflow | Trigger | Runner | What it does |
+|---|---|---|---|
+| `deploy-prod.yaml` | Push to `main`, filter `apps/**` | `prod-runner` | Builds only changed apps via `dorny/paths-filter`, pushes Docker images, deploys |
+| `deploy-staging.yaml` | Push to `staging`, filter `apps/**` | `staging-runner` | Same shape, staging environment |
+| `deploy-monitoring.yaml` | Push to `main` or `monitoring-deploy`, filter `monitoring/**` | `prod-runner` | Runs Ansible playbook to provision Prometheus + Grafana + node-exporter |
+
+Each app has its own `Dockerfile` at `apps/<app>/Dockerfile`.
 
 ### Databases (Pencom)
 
-| Database | Type | Service | Notes |
+| Database | Type | Host | Service |
 |---|---|---|---|
-| `pencom_core_db2` | PostgreSQL | core | Main business data |
-| `pencom_payments` | PostgreSQL | payments | Payment records |
-| `pencom_compliance` | PostgreSQL | compliance | GLI, PCC, PFC compliance data |
-| `pencom_external_integrations` | PostgreSQL | external-integrations | Integration data |
-| `pencom_notifications` | MongoDB | notifications | Notification records |
-| `pencom_audit_db` | PostgreSQL | audit | Audit trail |
-| PENCOM Oracle DB | Oracle | external-integrations | On-prem PENCOM read integration |
+| `pencom_core_db2` | PostgreSQL | VPS 3 | core |
+| `pencom_payments` | PostgreSQL | VPS 3 | payments |
+| `pencom_compliance` | PostgreSQL | VPS 3 | compliance + external-gateway |
+| `pencom_external_integrations` | PostgreSQL | VPS 3 | external-integrations |
+| `pencom_audit` | PostgreSQL | VPS 3 | audit |
+| `pencom_notifications` | MongoDB | VPS 3 | notifications |
+| `pencom_core_otp` | MongoDB | VPS 3 | core (OTP storage) |
+| Redis | Redis | VPS 3 | compliance (Bull queues) + core (magic-link cache) |
+| Oracle ECRS | Oracle | PenCom on-prem | core + compliance (read-only) |
+
+### File Storage (Pencom)
+
+MinIO on VPS 4, accessed via the `@aws-sdk/client-s3` SDK (MinIO is S3-compatible). Configure with `SPACES_*` env vars pointing at the MinIO endpoint.
+
+| Bucket path | Contents |
+|---|---|
+| `CERTIFICATES/` | PCC PDF certificates |
+| `EMPLOYER_CODE_REQUEST_DOCUMENT/` | Employer registration documents |
+| `TUTORIAL_VIDEOS/` | Admin/employer tutorial videos |
+| `TUTORIAL_THUMBNAILS/` | Video thumbnails |
+| PFC upload namespace | Monthly contribution CSVs from PFC partners |
 
 ### External Integrations (Pencom)
 
-| Service | Purpose |
-|---|---|
-| Remita | Pension payment processing |
-| PENCOM Oracle DB | Official pension data source (on-prem) |
-| SendGrid | Email notifications |
-| Termii | SMS notifications |
-| AWS S3 | Document storage |
-| PostHog | Product analytics |
-| Highlight.io | Error tracking |
-| Redis (BullMQ) | Background job queues |
+| Service | Purpose | Notes |
+|---|---|---|
+| Remita | Pension certificate fee payment processing | Nigerian payment gateway |
+| PENCOM Oracle ECRS | Official employer/employee/PFA data source | Read-only; PenCom-managed |
+| SendGrid | Email notifications (OTPs, certificates, alerts) | Via `notifications` service |
+| Termii | SMS notifications | **⚠ Currently unused — no producer** |
+| Highlight.io | Error tracking + APM | Every service's `main.ts` |
+| PostHog | Product analytics | api-gateway only, dev disabled |
+
+### Monitoring
+
+Prometheus + Grafana stack provisioned via Ansible (`monitoring/ansible/`), deployed via `deploy-monitoring.yaml`.
+
+- **Node-exporter** collects host-level metrics from the VPS nodes.
+- **⚠ No application-level Grafana dashboards exist** — only host metrics via node-exporter.
 
 ---
 
 ## Network Security Notes
 
-- All production services use TLS (HTTPS / SSL)
-- Database connections use SSL with CA certificate verification (KRO)
-- Internal service communication in Pencom is TCP-based (not exposed to internet)
-- JWT is used for API authentication across all platforms
-- An `INTERNAL_API_KEY` header is used for service-to-service calls in Pencom
+- VPS 1 is the only internet-facing node. VPS 2, 3, and 4 communicate only over the internal network.
+- Nginx on VPS 1 handles TLS termination. All external traffic is HTTPS.
+- All inter-service HTTP calls carry an `INTERNAL_API_KEY` header. Backend services on VPS 2 (`core`, `notifications`, `audit`) verify it via `ApiKeyAuthGuard`. Other services rely on network isolation.
+- JWT is used for end-user authentication (employer/admin). Separate JWT secret for external PFC partner tokens.
+- Database connections do not use SSL (internal network only). Oracle connections are read-only.
+- KRO database connections use SSL with CA certificate verification (DigitalOcean managed database).
