@@ -1,0 +1,100 @@
+site_name: Tomanu Engineering Docs
+site_description: Engineering handover documentation for KROTrust, KROGiving, and eHub (Pencom) systems
+site_author: Tomanu Engineering
+docs_dir: src
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Infrastructure: infrastructure.md
+  - Databases: databases.md
+  - Deployment: deployment.md
+  - Shutdown & Recovery: shutdown-and-recovery.md
+  - Projects:
+    - projects/index.md
+    - GIV Admin Dashboard: projects/giv-admin-new.md
+    - KRO Backend: projects/kro-backend.md
+    - KRO DevOps: projects/kro-devops.md
+    - KROGiving Backend: projects/krogiving-backend.md
+    - KROGiving Frontend: projects/krogiving-frontend.md
+    - Pencom (eHub):
+      - projects/pencom/index.md
+      - Architecture: projects/pencom/architecture.md
+      - Business Logic: projects/pencom/business-logic.md
+      - Domain Model: projects/pencom/domain-model.md
+      - Integrations & Env Vars: projects/pencom/integrations.md
+      - Developer Onboarding: projects/pencom/onboarding.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search:
+      lang: en
+  - minify:
+      minify_html: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org
+  generator: false
