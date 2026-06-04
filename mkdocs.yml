@@ -1,4 +1,5 @@
 site_name: Tomanu Engineering Docs
+site_url: https://kropay.github.io/docs/
 site_description: Engineering handover documentation for KROTrust, KROGiving, and eHub (Pencom) systems
 site_author: Tomanu Engineering
 docs_dir: src
